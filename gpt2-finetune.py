@@ -210,8 +210,8 @@ def main(argv=None):
         wandb.init(
             project=name,
             config={
-                "batch_size": BATCH_SIZE,
-                "learning_rate": LEARNING_RATE,
+                "batch_size": batch_size,
+                "learning_rate": learning_rate,
                 "dataset": "SQuAD",
             },
         )
