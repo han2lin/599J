@@ -30,17 +30,25 @@ def encode(examples, tokenizer):
 
 
 
-def get_datasets(tokenizer, dataset="han2lin/squad"):
-    all_datasets = load_dataset(dataset)
+def get_datasets(tokenizer, dataset="han2lin/squad", cache_dir=None):
+    all_datasets = load_dataset(dataset, cache_dir=cache_dir)
     train_dataset = all_datasets['train']
     valid_dataset = all_datasets['valid']
 
     tokenizer.padding_side = "left"
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    
-    train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), batched=True)
-    valid_dataset = valid_dataset.map(lambda x: encode(x, tokenizer), batched=True)
+
+    train_cache_file_name, valid_cache_file_name = None, None
+    if cache_dir:
+        train_cache_file_name = f"{cache_dir}/train_encoded"
+        valid_cache_file_name = f"{cache_dir}/valid_encoded"
+    train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), 
+                                      batched=True,
+                                      cache_file_name=train_cache_file_name)
+    valid_dataset = valid_dataset.map(lambda x: encode(x, tokenizer), 
+                                      batched=True,
+                                      cache_file_name=valid_cache_file_name)
 
     return train_dataset, valid_dataset
 
@@ -147,6 +155,13 @@ def main(argv=None):
         default="gpt2-large",
         help="GPT2 model path for retrieving weights to fine-tune",
     )
+    parser.add_argument(
+        "--cache_dir",
+        dest="cache_dir",
+        type=str,
+        required=False,
+        help="Directory for caching model weights, tokens, etc. Useful if running on hyak.",
+    )
 
 
     parser.add_argument(
@@ -195,6 +210,10 @@ def main(argv=None):
     name = model_path.split('/')[-1]
     output_dir = f"ft_log_{name}"
     save_dir = f"ft_model_{name}"
+    cache_dir = known_args.cache_dir
+    
+    if cache_dir: 
+        logging.info(f"Using cache_dir={cache_dir}")
 
     #  Fine tuning args
     batch_size = known_args.batch_size
@@ -221,12 +240,12 @@ def main(argv=None):
 
     tokenizer = None
     if model_size == ModelSize.MEDIUM:
-        tokenizer = AutoTokenizer.from_pretrained("gpt2-medium")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2-medium", cache_dir=cache_dir)
     else:
-        tokenizer = AutoTokenizer.from_pretrained("gpt2-large")
+        tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
     train_dataset, valid_dataset = get_datasets(tokenizer)
-    model = AutoModelForCausalLM.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(model_path, cache_dir=cache_dir)
 
     fine_tune_gpt2(model, 
                    tokenizer, 
