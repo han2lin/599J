@@ -23,9 +23,9 @@ def encode(examples, tokenizer):
     contexes = examples["context"]
     questions = examples["question"]
     answers = examples["answers"]
-    samples = [f"""{context}
-{question}
-{answer['text'][0]}""" for context, question, answer in zip(contexes, questions, answers)]
+    samples = [f"""Context: {context}
+Question: {question}
+Answer: {answer['text'][0]}{tokenizer.eos_token}""" for context, question, answer in zip(contexes, questions, answers)]
     return tokenizer(samples, truncation=True, padding="max_length")
 
 
