@@ -41,8 +41,8 @@ def get_datasets(tokenizer, dataset="han2lin/squad", cache_dir=None):
 
     train_cache_file_name, valid_cache_file_name = None, None
     if cache_dir:
-        train_cache_file_name = f"{cache_dir}/train_encoded"
-        valid_cache_file_name = f"{cache_dir}/valid_encoded"
+        train_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_train_encoded"
+        valid_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_valid_encoded"
     logging.info(f"Dataset cache files: {train_cache_file_name} and {valid_cache_file_name}")
     train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), 
                                       batched=True,
