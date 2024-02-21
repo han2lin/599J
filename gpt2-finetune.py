@@ -43,6 +43,7 @@ def get_datasets(tokenizer, dataset="han2lin/squad", cache_dir=None):
     if cache_dir:
         train_cache_file_name = f"{cache_dir}/train_encoded"
         valid_cache_file_name = f"{cache_dir}/valid_encoded"
+    logging.info(f"Dataset cache files: {train_cache_file_name} and {valid_cache_file_name}")
     train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), 
                                       batched=True,
                                       cache_file_name=train_cache_file_name)
@@ -244,7 +245,7 @@ def main(argv=None):
     else:
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
-    train_dataset, valid_dataset = get_datasets(tokenizer)
+    train_dataset, valid_dataset = get_datasets(tokenizer, cache_dir=cache_dir)
     model = AutoModelForCausalLM.from_pretrained(model_path, cache_dir=cache_dir)
 
     fine_tune_gpt2(model, 
