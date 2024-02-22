@@ -69,8 +69,8 @@ def fine_tune_gpt2(model,
                    report_to="all"):
 
     logging.info("Fine tuning parameters:")
-    for label, param in zip(["logging_steps", "save_steps", "batch_size", "epochs", "learning_rate"],
-                            [logging_steps, save_steps, batch_size, epochs, learning_rate]):
+    for label, param in zip(["logging_steps", "save_steps", "per_device_train_batch_size", "per_device_eval_batch_size", "epochs", "learning_rate"],
+                            [logging_steps, save_steps, per_device_train_batch_size, per_device_eval_batch_size, epochs, learning_rate]):
         logging.info(f"\t{label}: {param}")
         
     # Create data collator for language modeling
