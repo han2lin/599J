@@ -166,7 +166,7 @@ def main(argv=None):
         "--batch_size",
         dest="batch_size",
         type=int_range(1,64000),
-        default=2,
+        default=250,
         help="Batch size for inference",
     )
     parser.add_argument(
