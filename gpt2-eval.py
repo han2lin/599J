@@ -99,8 +99,8 @@ def score_data(dataset_pd):
 
 
 def write_stats(dataset_pd: pd.DataFrame, 
-                model_name: string, 
-                output_dir: string):
+                model_name: str, 
+                output_dir: str):
     stats_path = f"{output_dir}/{model_name}_stats.csv"
     predictions_path = f"{output_dir}/{model_name}_pred.csv"
 
