@@ -144,11 +144,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Zero-shot SQuAD evals for GPT 2")
     
     parser.add_argument(
-        "--use_cuda",
+        "--cuda",
         dest="use_cuda",
-        type=bool,
         default=True,
-        help="Set to True to use Cuda",
+        action="store_true",
+        help="Use Cuda for eval",
+    )
+    parser.add_argument(
+        "--no-cuda",
+        dest="use_cuda",
+        action="store_false",
+        help="Do not use Cuda",
     )
     parser.add_argument(
         "--model_size",
