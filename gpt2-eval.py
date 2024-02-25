@@ -60,9 +60,10 @@ def get_predictions(prompts,
     if use_cuda:
         input_ids.to("cuda")
     greedy_output = model.generate(**input_ids, max_new_tokens=max_new_tokens)
-    del input_ids
+    predictions = tokenizer.batch_decode(greedy_output, skip_special_tokens=True)
+    del input_ids, greedy_output
     torch.cuda.empty_cache()
-    return tokenizer.batch_decode(greedy_output, skip_special_tokens=True)
+    return predictions
 
 
 def extract_answer(s, tokenizer=None):
