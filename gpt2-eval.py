@@ -39,7 +39,7 @@ def get_test_dataset(tokenizer,
     
     test_cache_file_name = None
     if cache_dir:
-        test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_train_encoded"
+        test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_test_encoded"
     logging.info(f"Dataset cache files: {test_cache_file_name}")
     test_dataset = test_dataset.map(make_prompts, batched=True)
     
@@ -109,7 +109,7 @@ def write_stats(dataset_pd: pd.DataFrame,
                 output_dir: str):
     stats_path = f"{output_dir}/{model_name}_stats.csv"
     predictions_path = f"{output_dir}/{model_name}_pred.csv"
-
+    
     dataset_pd[['exact_score', 'f1_score']].mean().to_csv(stats_path, header=False)
     dataset_pd.to_csv(predictions_path, columns=['id', 'prediction', 'exact_score', 'f1_score'])
 
@@ -207,13 +207,13 @@ def main(argv=None):
         logging.info(f"Using cuda")
 
     name = model_path.split('/')[-1]
-    output_dir = f"ft_log_{name}"
-    save_dir = f"ft_model_{name}"
     cache_dir = known_args.cache_dir
-    
+    output_dir = known_args.output_dir
     if cache_dir: 
         logging.info(f"Using cache_dir={cache_dir}")
-        
+    if not output_dir:
+        output_dir = cache_dir
+    
     tokenizer = None
     if model_size == ModelSize.MEDIUM:
         tokenizer = AutoTokenizer.from_pretrained("gpt2-medium", cache_dir=cache_dir)
@@ -239,9 +239,6 @@ def main(argv=None):
     dataset_pd['prediction'] = [extract_answer(p) for p in full_predictions]
     exact_scores, f1_scores = score_data(dataset_pd)
 
-    output_dir = known_args.output_dir
-    if not output_dir:
-        output_dir = cache_dir
     logging.info(f"Writing prediction and stats into {output_dir}")
     write_stats(dataset_pd, name, cache_dir)
 
