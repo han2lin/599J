@@ -248,6 +248,8 @@ def main(argv=None):
     
     dataset_pd['prediction'] = [extract_answer(p) for p in full_predictions]
     exact_scores, f1_scores = score_data(dataset_pd)
+    dataset_pd['exact_score'] = exact_scores
+    dataset_pd['f1_score'] = f1_scores
 
     logging.info(f"Writing prediction and stats into {output_dir}")
     write_stats(dataset_pd, name, cache_dir)
