@@ -1,4 +1,5 @@
 from datasets import load_dataset
+from enum import Enum
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.data.metrics import squad_metrics
 from transformers.data.processors import squad
@@ -10,6 +11,10 @@ import pandas as pd
 import tqdm
 import transformers
 
+
+class ModelSize(Enum):
+    MEDIUM = 1
+    LARGE = 2
 
 def make_prompts(examples):
     """Make QA prompts from examples"""
