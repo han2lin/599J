@@ -234,7 +234,7 @@ def main(argv=None):
     full_predictions = []
     for batch in tqdm.tqdm(split_batches(dataset_pd['prompt'].tolist(), batch_size), 
                            total=total_batches):
-        full_predictions += get_predictions(batch, model, use_cuda)
+        full_predictions += get_predictions(batch, model, tokenizer, use_cuda=use_cuda)
     
     dataset_pd['prediction'] = [extract_answer(p) for p in full_predictions]
     exact_scores, f1_scores = score_data(dataset_pd)
