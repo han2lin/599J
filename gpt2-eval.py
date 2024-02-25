@@ -198,9 +198,9 @@ def main(argv=None):
     model_path = known_args.model_path
 
     # Dataset
-    dataset = known_args.dataset
+    dataset_path = known_args.dataset_path
 
-    logging.info(f"Evaluating {model_path} of size {model_size} on {datsaet}")
+    logging.info(f"Evaluating {model_path} of size {model_size} on {dataset_path}")
 
     use_cuda = known_args.use_cuda
     if use_cuda:
