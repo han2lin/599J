@@ -10,6 +10,7 @@ import math
 import pandas as pd
 import tqdm
 import transformers
+import torch
 
 
 class ModelSize(Enum):
@@ -59,6 +60,8 @@ def get_predictions(prompts,
     if use_cuda:
         input_ids.to("cuda")
     greedy_output = model.generate(**input_ids, max_new_tokens=max_new_tokens)
+    del input_ids
+    torch.cuda.empty_cache()
     return tokenizer.batch_decode(greedy_output, skip_special_tokens=True)
 
 
