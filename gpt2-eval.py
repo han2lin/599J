@@ -170,8 +170,9 @@ def main(argv=None):
         "--model_path",
         dest="model_path",
         type=str,
-        default="gpt2-large",
-        help="GPT2 model path for retrieving weights",
+        action="append",
+        required=True,
+        help="GPT2 models to evaluate",
     )
     parser.add_argument(
         "--dataset_path",
@@ -207,18 +208,17 @@ def main(argv=None):
 
     # Model args
     model_size = known_args.model_size
-    model_path = known_args.model_path
+    model_paths = known_args.model_path
 
     # Dataset
     dataset_path = known_args.dataset_path
 
-    logging.info(f"Evaluating {model_path} of size {model_size} on {dataset_path}")
+    logging.info(f"Evaluating models of size {model_size} on {dataset_path}: {model_paths}")
 
     use_cuda = known_args.use_cuda
     if use_cuda:
         logging.info(f"Using cuda")
 
-    name = model_path.split("/")[-1]
     cache_dir = known_args.cache_dir
     output_dir = known_args.output_dir
     if cache_dir: 
@@ -233,28 +233,33 @@ def main(argv=None):
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
     test_dataset = get_test_dataset(tokenizer, dataset_path, cache_dir=cache_dir)
-    
-    model = AutoModelForCausalLM.from_pretrained(model_path, 
-                                                 cache_dir=cache_dir)
-    if use_cuda:
-        model.to("cuda")
-    
-    dataset_pd = pd.DataFrame(test_dataset)
 
-    batch_size = known_args.batch_size
-    total_batches = math.ceil(len(dataset_pd["prompt"]) / batch_size)
-    full_predictions = []
-    for batch in tqdm.tqdm(split_batches(dataset_pd["prompt"].tolist(), batch_size), 
-                           total=total_batches):
-        full_predictions += get_predictions(batch, model, tokenizer, use_cuda=use_cuda)
+    for model_path in tqdm.tqdm(model_paths):
+        logging.info(f"Evaluating model: {model_path}")
+        name = model_path.split("/")[-1]
+        model = AutoModelForCausalLM.from_pretrained(model_path, 
+                                                     cache_dir=cache_dir)
+        if use_cuda:
+            model.to("cuda")
+        
+        dataset_pd = pd.DataFrame(test_dataset)
     
-    dataset_pd["prediction"] = [extract_answer(p) for p in full_predictions]
-    exact_scores, f1_scores = score_data(dataset_pd)
-    dataset_pd["exact_score"] = exact_scores.values()
-    dataset_pd["f1_score"] = f1_scores.values()
-
-    logging.info(f"Writing prediction and stats into {output_dir}")
-    write_stats(dataset_pd, name, output_dir)
+        batch_size = known_args.batch_size
+        total_batches = math.ceil(len(dataset_pd["prompt"]) / batch_size)
+        full_predictions = []
+        for batch in tqdm.tqdm(split_batches(dataset_pd["prompt"].tolist(), batch_size), 
+                               total=total_batches):
+            full_predictions += get_predictions(batch, model, tokenizer, use_cuda=use_cuda)
+        
+        dataset_pd["prediction"] = [extract_answer(p) for p in full_predictions]
+        exact_scores, f1_scores = score_data(dataset_pd)
+        dataset_pd["exact_score"] = exact_scores.values()
+        dataset_pd["f1_score"] = f1_scores.values()
+    
+        logging.info(f"Writing prediction and stats into {output_dir}")
+        write_stats(dataset_pd, name, output_dir)
+        
+        del dataset_pd
 
 
 if __name__ == "__main__":
