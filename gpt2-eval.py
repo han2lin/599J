@@ -24,7 +24,7 @@ def make_prompts(examples):
     samples = [f"""Context: {context}
 Question: {question}
 Answer:""" for context, question in zip(contexes, questions)]
-    return {'prompt': samples}
+    return {"prompt": samples}
 
 
 def get_test_dataset(tokenizer, 
@@ -56,7 +56,7 @@ def get_predictions(prompts,
                     tokenizer, 
                     max_new_tokens=50,
                     use_cuda=True):
-    input_ids = tokenizer(prompts, padding=True, return_tensors='pt')
+    input_ids = tokenizer(prompts, padding=True, return_tensors="pt")
     if use_cuda:
         input_ids.to("cuda")
     greedy_output = model.generate(**input_ids, max_new_tokens=max_new_tokens)
@@ -67,11 +67,11 @@ def get_predictions(prompts,
 
 
 def extract_answer(s, tokenizer=None):
-    key = 'Answer: '
+    key = "Answer: "
     answer = s[s.find(key):]
     answer_end = len(answer)
     
-    ends = ['.', '\n']
+    ends = [".", "\n"]
     if tokenizer and tokenizer.eos_token:
         ends.append(tokenizer.eos_token)
     
@@ -86,9 +86,9 @@ def extract_answer(s, tokenizer=None):
 def to_squad_examples(dataset_pd):
     examples = []
     for _, sample in dataset_pd.iterrows():
-        answers = [{'text': t, 
-                    'answer_start': s} for t, s in zip(sample['answers']['text'], 
-                                                       sample['answers']['answer_start'])]
+        answers = [{"text": t, 
+                    "answer_start": s} for t, s in zip(sample["answers"]["text"], 
+                                                       sample["answers"]["answer_start"])]
         examples.append(squad.SquadExample(
             qas_id=sample["id"],
             question_text=sample["question"],
@@ -102,7 +102,7 @@ def to_squad_examples(dataset_pd):
 
 def score_data(dataset_pd):
     predictions_dict = {}
-    for _, (id, prediction) in dataset_pd[['id', 'prediction']].iterrows():
+    for _, (id, prediction) in dataset_pd[["id", "prediction"]].iterrows():
         predictions_dict[id] = prediction
     examples = to_squad_examples(dataset_pd)
     return squad_metrics.get_raw_scores(examples, predictions_dict)
@@ -113,9 +113,11 @@ def write_stats(dataset_pd: pd.DataFrame,
                 output_dir: str):
     stats_path = f"{output_dir}/{model_name}_stats.csv"
     predictions_path = f"{output_dir}/{model_name}_pred.csv"
-    
-    dataset_pd[['exact_score', 'f1_score']].mean().to_csv(stats_path, header=False)
-    dataset_pd.to_csv(predictions_path, columns=['id', 'prediction', 'exact_score', 'f1_score'])
+
+    stats = dataset_pd[["exact_score", "f1_score"]].mean()
+    logging.info(f"Overall stats:\n{stats}")
+    stats.to_csv(stats_path, header=False)
+    dataset_pd.to_csv(predictions_path, columns=["id", "prediction", "exact_score", "f1_score"])
 
 
 def model_size_string(value):
@@ -162,14 +164,14 @@ def main(argv=None):
         dest="model_size",
         type=model_size_string,
         default="large",
-        help="GPT2 size to fine-tune ('medium' or 'large'). Defaults to large.",
+        help="GPT2 size to evaluate ('medium' or 'large'). Defaults to large.",
     )
     parser.add_argument(
         "--model_path",
         dest="model_path",
         type=str,
         default="gpt2-large",
-        help="GPT2 model path for retrieving weights to fine-tune",
+        help="GPT2 model path for retrieving weights",
     )
     parser.add_argument(
         "--dataset_path",
@@ -216,7 +218,7 @@ def main(argv=None):
     if use_cuda:
         logging.info(f"Using cuda")
 
-    name = model_path.split('/')[-1]
+    name = model_path.split("/")[-1]
     cache_dir = known_args.cache_dir
     output_dir = known_args.output_dir
     if cache_dir: 
@@ -240,19 +242,19 @@ def main(argv=None):
     dataset_pd = pd.DataFrame(test_dataset)
 
     batch_size = known_args.batch_size
-    total_batches = math.ceil(len(dataset_pd['prompt']) / batch_size)
+    total_batches = math.ceil(len(dataset_pd["prompt"]) / batch_size)
     full_predictions = []
-    for batch in tqdm.tqdm(split_batches(dataset_pd['prompt'].tolist(), batch_size), 
+    for batch in tqdm.tqdm(split_batches(dataset_pd["prompt"].tolist(), batch_size), 
                            total=total_batches):
         full_predictions += get_predictions(batch, model, tokenizer, use_cuda=use_cuda)
     
-    dataset_pd['prediction'] = [extract_answer(p) for p in full_predictions]
+    dataset_pd["prediction"] = [extract_answer(p) for p in full_predictions]
     exact_scores, f1_scores = score_data(dataset_pd)
-    dataset_pd['exact_score'] = exact_scores
-    dataset_pd['f1_score'] = f1_scores
+    dataset_pd["exact_score"] = exact_scores
+    dataset_pd["f1_score"] = f1_scores
 
     logging.info(f"Writing prediction and stats into {output_dir}")
-    write_stats(dataset_pd, name, cache_dir)
+    write_stats(dataset_pd, name, output_dir)
 
 
 if __name__ == "__main__":
