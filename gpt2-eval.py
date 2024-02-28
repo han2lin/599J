@@ -31,6 +31,7 @@ def get_test_dataset(tokenizer,
                      dataset="han2lin/squad", 
                      cache_dir=None,
                      context_label="context"):
+    logging.info(f"Loading test dataset with cache_dir: {cache_dir}")
     all_datasets = load_dataset(dataset, cache_dir=cache_dir)
     test_dataset = all_datasets["test"]
     logging.info(f"Test dataset size: {len(test_dataset)}")
@@ -244,7 +245,7 @@ def main(argv=None):
 
     logging.info(f"Evaluating models of size {model_size} on {dataset_path}: {model_paths}")
     if context_label != "context":
-        logging.info(f"Evaluating with perturbation {context_label} from {dataset_path}")
+        logging.info(f"Evaluating with perturbation '{context_label}' from {dataset_path}")
 
     use_cuda = known_args.use_cuda
     if use_cuda:
