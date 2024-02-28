@@ -43,7 +43,11 @@ def get_test_dataset(tokenizer,
     if cache_dir:
         test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_test_encoded"
     logging.info(f"Dataset cache files: {test_cache_file_name}")
-    test_dataset = test_dataset.map(lambda x: make_prompts(x, context_label=context_label), batched=True)
+    test_dataset = test_dataset.map(
+        lambda x: make_prompts(x, context_label=context_label), 
+        batched=True,
+        cache_file_name=test_cache_file_name,
+    )
     
     return test_dataset
 
