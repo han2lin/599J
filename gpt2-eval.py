@@ -63,8 +63,9 @@ def get_predictions(prompts,
                     max_new_tokens=50,
                     use_cuda=True):
     input_ids = tokenizer(prompts,
-                          max_length=1000,
+                          max_length=1024,
                           padding="max_length", 
+                          truncation=True,
                           return_tensors="pt")
     if use_cuda:
         input_ids.to("cuda")
