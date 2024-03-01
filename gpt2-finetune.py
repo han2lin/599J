@@ -158,6 +158,13 @@ def main(argv=None):
         help="GPT2 model path for retrieving weights to fine-tune",
     )
     parser.add_argument(
+        "--dataset_path",
+        dest="dataset_path",
+        type=str,
+        default="han2lin/squad",
+        help="Dataset to grab fine-tuning data. Defaults to han2lin/squad.",
+    )
+    parser.add_argument(
         "--cache_dir",
         dest="cache_dir",
         type=str,
@@ -206,8 +213,10 @@ def main(argv=None):
     # Model args
     model_size = known_args.model_size
     model_path = known_args.model_path
+    # Dataset
+    dataset_path = known_args.dataset_path
 
-    logging.info(f"Fine tuning {model_path} of size {model_size}")
+    logging.info(f"Fine-tuning {model_path} of size {model_size} on {dataset_path}")
 
     name = model_path.split('/')[-1]
     output_dir = f"ft_log_{name}"
@@ -246,7 +255,7 @@ def main(argv=None):
     else:
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
-    train_dataset, valid_dataset = get_datasets(tokenizer, cache_dir=cache_dir)
+    train_dataset, valid_dataset = get_datasets(tokenizer, dataset=dataset_path, cache_dir=cache_dir)
     model = AutoModelForCausalLM.from_pretrained(model_path, cache_dir=cache_dir)
 
     fine_tune_gpt2(model, 
