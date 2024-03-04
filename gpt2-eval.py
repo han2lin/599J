@@ -43,7 +43,7 @@ def get_test_dataset(tokenizer,
     
     test_cache_file_name = None
     if cache_dir:
-        test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_test_encoded"
+        test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_{context_label}_test_encoded"
     logging.info(f"Dataset cache file: {test_cache_file_name}")
     test_dataset = test_dataset.map(
         lambda x: make_prompts(x, context_label=context_label), 
@@ -64,7 +64,7 @@ def get_predictions(prompts,
                     max_new_tokens=50,
                     use_cuda=True):
     input_ids = tokenizer(prompts,
-                          max_length=1024,
+                          max_length=970,
                           padding="max_length", 
                           truncation=True,
                           return_tensors="pt")
