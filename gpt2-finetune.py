@@ -86,8 +86,7 @@ def get_perplexity_dataset(tokenizer, dataset, perplexity_col, thresholds, cache
     after_len = len(train_dataset)
     logging.info(f"Perplexity dataset filtered from {before_len} to {after_len} ({after_len/before_len*1.0} remains).")
     train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), 
-                                      batched=True,
-                                      cache_file_name=train_cache_file_name)
+                                      batched=True)
     return train_dataset
 
 
