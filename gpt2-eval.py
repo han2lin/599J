@@ -8,6 +8,7 @@ import argparse
 import logging
 import math
 import pandas as pd
+import time
 import tqdm
 import transformers
 import torch
@@ -122,8 +123,9 @@ def write_stats(dataset_pd: pd.DataFrame,
                 model_name: str, 
                 output_dir: str,
                 suffix: str = ""):
-    stats_path = f"{output_dir}/{model_name}_stats.csv"
-    predictions_path = f"{output_dir}/{model_name}_pred.csv"
+    utc_seconds = int(time.time())
+    stats_path = f"{output_dir}/{model_name}_stats_{utc_seconds}.csv"
+    predictions_path = f"{output_dir}/{model_name}_pred_{utc_seconds}.csv"
     if suffix:
         stats_path = f"{output_dir}/{model_name}_{suffix}_stats.csv"
         predictions_path = f"{output_dir}/{model_name}_{suffix}_pred.csv"

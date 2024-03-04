@@ -1,7 +1,6 @@
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelWithLMHead, AutoModelForCausalLM
 from transformers import DataCollatorForLanguageModeling
-from transformers import GPT2Tokenizer, GPT2Model, GPT2LMHeadModel, GPT2Config, GPT2ForQuestionAnswering
 from transformers import TrainingArguments, Trainer
 from torch.utils.data import Dataset
 import argparse
@@ -10,6 +9,7 @@ from enum import Enum
 import logging
 import pandas as pd
 import re
+import time
 import transformers
 import torch
 import wandb
@@ -20,12 +20,12 @@ class ModelSize(Enum):
 
 
 def encode(examples, tokenizer):
-    contexes = examples["context"]
+    contexts = examples["context"]
     questions = examples["question"]
     answers = examples["answers"]
     samples = [f"""Context: {context}
 Question: {question}
-Answer: {answer['text'][0]}{tokenizer.eos_token}""" for context, question, answer in zip(contexes, questions, answers)]
+Answer: {answer['text'][0]}{tokenizer.eos_token}""" for context, question, answer in zip(contexts, questions, answers)]
     return tokenizer(samples, truncation=True, padding="max_length")
 
 
@@ -52,6 +52,37 @@ def get_datasets(tokenizer, dataset="han2lin/squad", cache_dir=None):
                                       cache_file_name=valid_cache_file_name)
 
     return train_dataset, valid_dataset
+
+
+def array_to_percentile(arr):
+    def to_percentile(arr, i):
+        index = sorted(arr).index(i)
+        return (100 / len(arr)) * (index+1)
+    return [to_percentile(arr, i) for i in arr]
+
+def to_percentiles(examples, perplexity_col):
+    perplexity_scores = examples[perplexity_col]
+    return {"percentile": array_to_percentile(perplexity_scores)}
+
+def get_perplexity_dataset(tokenizer, dataset, perplexity_col, thresholds, cache_dir=None):
+    all_datasets = load_dataset(dataset, cache_dir=cache_dir)
+    train_dataset = all_datasets["train"]
+    lower, upper = thresholds
+
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    train_cache_file_name = None
+    if cache_dir:
+        train_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_train_encoded"
+    logging.info(f"Perplexity dataset cache file: {train_cache_file_name}")
+    train_dataset = train_dataset.map(lambda x: to_percentiles(x, perplexity_col), 
+                                      batched=True,
+                                      cache_file_name=train_cache_file_name)
+    train_dataset = train_dataset.filter(lambda example: 
+                                         example["percentile"] >= lower and example["percentile"] <= upper)
+    return train_dataset
 
 
 def fine_tune_gpt2(model, 
@@ -132,6 +163,18 @@ def int_range(min, max):
         return i
     return int_range_checker
 
+def perplexity_threshold_pair(value):
+    if value.find(',') < 0:
+        raise argparse.ArgumentTypeError("Expected float pair of the form 'x,y'")
+    arr = value.split(',')
+    if len(arr) != 2:
+        raise argparse.ArgumentTypeError("Expected only 1 comma in the float pair, e.g. '0,30'")
+    try:
+        lower = float(arr[0])
+        upper = float(arr[1])
+        return lower, upper
+    except ValueError:
+        raise argparse.ArgumentTypeError("float expected")
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Fine-tune GPT 2")
@@ -165,14 +208,33 @@ def main(argv=None):
         help="Dataset to grab fine-tuning data. Defaults to han2lin/squad.",
     )
     parser.add_argument(
+        "--perplexity_dataset_path",
+        dest="perplexity_dataset_path",
+        type=str,
+        help="Dataset with perplexity scores to grab train split from. Must be used with --perplexity_thresholds.",
+    )
+    parser.add_argument(
+        "--perplexity_col",
+        dest="perplexity_col",
+        type=str,
+        help="Name of column in perplexity dataset holding perplexity scores.",
+    )
+    parser.add_argument(
+        "--perplexity_thresholds",
+        dest="perplexity_thresholds",
+        type=perplexity_threshold_pair,
+        help="Percentile of perplexity scores to keep from --perplexity_dataset_path. Excepts "
+             "a float pair of the form 'x,y' where x% is the lower threshold and y% is the upper "
+             "threshold. For example, to specify the top 30% use '70,100' and to specify the "
+             "bottom 30% use '0,30'.",
+    )
+    parser.add_argument(
         "--cache_dir",
         dest="cache_dir",
         type=str,
         required=False,
         help="Directory for caching model weights, tokens, etc. Useful if running on hyak.",
     )
-
-
     parser.add_argument(
         "--batch_size",
         dest="batch_size",
@@ -215,12 +277,27 @@ def main(argv=None):
     model_path = known_args.model_path
     # Dataset
     dataset_path = known_args.dataset_path
-
-    logging.info(f"Fine-tuning {model_path} of size {model_size} on {dataset_path}")
+    
+    logging.info(f"Fine-tuning {model_path} of size {model_size}")
+    perplexity_thresholds = None
+    if known_args.perplexity_dataset_path:
+        perplexity_dataset_path = known_args.perplexity_dataset_path
+        if not known_args.perplexity_col:
+            raise argparse.ArgumentTypeError("No perplexity threshold column specified.")
+        if not known_args.perplexity_thresholds:
+            raise argparse.ArgumentTypeError("No perplexity threshold set. Use --perplexity_thresholds "
+                                             "to specify what perplexity scores to keep.")
+        perplexity_col = known_args.perplexity_col
+        perplexity_thresholds = known_args.perplexity_thresholds
+        logging.info(f"Training dataset path: {perplexity_dataset_path} with perplexity thresholds {perplexity_thresholds}")
+        logging.info(f"Validation dataset path: {dataset_path}")
+    else:
+        logging.info(f"Training and validation dataset path: {dataset_path}")
 
     name = model_path.split('/')[-1]
-    output_dir = f"ft_log_{name}"
-    save_dir = f"ft_model_{name}"
+    utc_seconds = int(time.time())
+    output_dir = f"ft_log_{name}_{utc_seconds}"
+    save_dir = f"ft_model_{name}_{utc_seconds}"
     cache_dir = known_args.cache_dir
     
     if cache_dir: 
@@ -256,6 +333,12 @@ def main(argv=None):
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
     train_dataset, valid_dataset = get_datasets(tokenizer, dataset=dataset_path, cache_dir=cache_dir)
+    if perplexity_threshold:
+        train_dataset = get_perplexity_dataset(tokenizer, 
+                                               dataset=perplexity_dataset_path, 
+                                               perplexity_col=perplexity_col,
+                                               thresholds=perplexity_thresholds, 
+                                               cache_dir=cache_dir)
     model = AutoModelForCausalLM.from_pretrained(model_path, cache_dir=cache_dir)
 
     fine_tune_gpt2(model, 
