@@ -75,7 +75,7 @@ def get_perplexity_dataset(tokenizer, dataset, perplexity_col, thresholds, cache
 
     train_cache_file_name = None
     if cache_dir:
-        train_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_train_encoded"
+        train_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_ppl_train_encoded"
     logging.info(f"Perplexity dataset cache file: {train_cache_file_name}")
     train_dataset = train_dataset.map(lambda x: to_percentiles(x, perplexity_col), 
                                       batched=True,
@@ -85,6 +85,9 @@ def get_perplexity_dataset(tokenizer, dataset, perplexity_col, thresholds, cache
                                          example["percentile"] >= lower and example["percentile"] <= upper)
     after_len = len(train_dataset)
     logging.info(f"Perplexity dataset filtered from {before_len} to {after_len} ({after_len/before_len*1.0} remains).")
+    train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), 
+                                      batched=True,
+                                      cache_file_name=train_cache_file_name)
     return train_dataset
 
 
