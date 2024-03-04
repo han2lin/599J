@@ -84,7 +84,7 @@ def get_perplexity_dataset(tokenizer, dataset, perplexity_col, thresholds, cache
     train_dataset = train_dataset.filter(lambda example: 
                                          example["percentile"] >= lower and example["percentile"] <= upper)
     after_len = len(train_dataset)
-    logging.info(f"Perplexity dataset filtered from {before_len} to {after_len) ({after_len/before_len*1.0) remains).")
+    logging.info(f"Perplexity dataset filtered from {before_len} to {after_len} ({after_len/before_len*1.0} remains).")
     return train_dataset
 
 
