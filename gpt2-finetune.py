@@ -336,7 +336,7 @@ def main(argv=None):
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
     train_dataset, valid_dataset = get_datasets(tokenizer, dataset=dataset_path, cache_dir=cache_dir)
-    if perplexity_threshold:
+    if perplexity_thresholds:
         train_dataset = get_perplexity_dataset(tokenizer, 
                                                dataset=perplexity_dataset_path, 
                                                perplexity_col=perplexity_col,
