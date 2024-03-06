@@ -303,6 +303,10 @@ def main(argv=None):
     utc_seconds = int(time.time())
     output_dir = f"ft_log_{name}_{utc_seconds}"
     save_dir = f"ft_model_{name}_{utc_seconds}"
+    if perplexity_thresholds:
+        perplexity_tag = f"ppl_{perplexity_thresholds[0]}_{perplexity_thresholds[1]}"
+        output_dir = f"ft_log_{name}_{perplexity_tag}_{utc_seconds}"
+        save_dir = f"ft_model_{name}_{perplexity_tag}_{utc_seconds}"
     cache_dir = known_args.cache_dir
     
     if cache_dir: 
