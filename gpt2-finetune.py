@@ -44,8 +44,8 @@ def get_datasets(tokenizer,
 
     train_cache_file_name, valid_cache_file_name = None, None
     if cache_dir:
-        train_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_train_encoded"
-        valid_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_valid_encoded"
+        train_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_{dataset.replace('/', '-')}_train_encoded"
+        valid_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_{dataset.replace('/', '-')}_valid_encoded"
     logging.info(f"Dataset cache files: {train_cache_file_name} and {valid_cache_file_name}")
     train_dataset = train_dataset.map(lambda x: encode(x, tokenizer), 
                                       batched=True,
