@@ -105,8 +105,25 @@ def fine_tune_gpt2(model,
                    report_to="all"):
 
     logging.info("Fine tuning parameters:")
-    for label, param in zip(["logging_steps", "save_steps", "per_device_train_batch_size", "per_device_eval_batch_size", "epochs", "learning_rate"],
-                            [logging_steps, save_steps, per_device_train_batch_size, per_device_eval_batch_size, epochs, learning_rate]):
+    for label, param in zip(["logging_steps", 
+                             "save_steps", 
+                             "per_device_train_batch_size", 
+                             "per_device_eval_batch_size", 
+                             "epochs", 
+                             "learning_rate",
+                             "report_to",
+                             "output_dir",
+                             "save_model_dir",],
+                            [logging_steps, 
+                             save_steps, 
+                             per_device_train_batch_size, 
+                             per_device_eval_batch_size, 
+                             epochs, 
+                             learning_rate,
+                             report_to,
+                             train_output_dir,
+                             save_model_dir,
+                            ]):
         logging.info(f"\t{label}: {param}")
         
     # Create data collator for language modeling
@@ -304,7 +321,7 @@ def main(argv=None):
     output_dir = f"ft_log_{name}_{utc_seconds}"
     save_dir = f"ft_model_{name}_{utc_seconds}"
     if perplexity_thresholds:
-        perplexity_tag = f"ppl_{perplexity_thresholds[0]}_{perplexity_thresholds[1]}"
+        perplexity_tag = f"ppl_{int(perplexity_thresholds[0])}_{int(perplexity_thresholds[1])}"
         output_dir = f"ft_log_{name}_{perplexity_tag}_{utc_seconds}"
         save_dir = f"ft_model_{name}_{perplexity_tag}_{utc_seconds}"
     cache_dir = known_args.cache_dir
