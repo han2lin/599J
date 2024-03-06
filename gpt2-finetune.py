@@ -30,7 +30,10 @@ Answer: {answer['text'][0]}{tokenizer.eos_token}""" for context, question, answe
 
 
 
-def get_datasets(tokenizer, dataset="han2lin/squad", cache_dir=None):
+def get_datasets(tokenizer,
+                 dataset="han2lin/squad",
+                 cache_dir=None,
+                 train_fraction=0):
     all_datasets = load_dataset(dataset, cache_dir=cache_dir)
     train_dataset = all_datasets['train']
     valid_dataset = all_datasets['valid']
@@ -50,6 +53,14 @@ def get_datasets(tokenizer, dataset="han2lin/squad", cache_dir=None):
     valid_dataset = valid_dataset.map(lambda x: encode(x, tokenizer), 
                                       batched=True,
                                       cache_file_name=valid_cache_file_name)
+
+    if train_fraction:
+        logging.info(f"Filtering train dataset with fraction: {train_fraction}")
+        before_len = len(train_dataset)
+        train_dataset = train_dataset.shuffle()
+        train_dataset = train_dataset.train_test_split(test_size=train_fraction)['test']
+        after_len = len(train_dataset)
+        logging.info(f"Train dataset filtered from {before_len} to {after_len} ({after_len/before_len*1.0} remains).")
 
     return train_dataset, valid_dataset
 
@@ -251,6 +262,13 @@ def main(argv=None):
              "bottom 30% use '0,30'.",
     )
     parser.add_argument(
+        "--train_fraction",
+        dest="train_fraction",
+        type=float,
+        default=0,
+        help="Fraction of training dataset to use. Fraction should be between 0 and 1. If 0, uses entire dataset.",
+    )
+    parser.add_argument(
         "--cache_dir",
         dest="cache_dir",
         type=str,
@@ -299,6 +317,7 @@ def main(argv=None):
     model_path = known_args.model_path
     # Dataset
     dataset_path = known_args.dataset_path
+    train_fraction = known_args.train_fraction
     
     logging.info(f"Fine-tuning {model_path} of size {model_size}")
     perplexity_thresholds = None
@@ -320,10 +339,14 @@ def main(argv=None):
     utc_seconds = int(time.time())
     output_dir = f"ft_log_{name}_{utc_seconds}"
     save_dir = f"ft_model_{name}_{utc_seconds}"
+    tag = None
     if perplexity_thresholds:
-        perplexity_tag = f"ppl_{int(perplexity_thresholds[0])}_{int(perplexity_thresholds[1])}"
-        output_dir = f"ft_log_{name}_{perplexity_tag}_{utc_seconds}"
-        save_dir = f"ft_model_{name}_{perplexity_tag}_{utc_seconds}"
+        tag = f"ppl_{int(perplexity_thresholds[0])}_{int(perplexity_thresholds[1])}"
+    if train_fraction:
+        tag = f"flt{train_fraction}"
+    if tag:
+        output_dir = f"ft_log_{name}_{tag}_{utc_seconds}"
+        save_dir = f"ft_model_{name}_{tag}_{utc_seconds}"
     cache_dir = known_args.cache_dir
     
     if cache_dir: 
@@ -358,7 +381,10 @@ def main(argv=None):
     else:
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
-    train_dataset, valid_dataset = get_datasets(tokenizer, dataset=dataset_path, cache_dir=cache_dir)
+    train_dataset, valid_dataset = get_datasets(tokenizer,
+                                                dataset=dataset_path,
+                                                cache_dir=cache_dir,
+                                                train_fraction=train_fraction)
     if perplexity_thresholds:
         train_dataset = get_perplexity_dataset(tokenizer, 
                                                dataset=perplexity_dataset_path, 
