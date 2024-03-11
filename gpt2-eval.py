@@ -8,6 +8,7 @@ import argparse
 import logging
 import math
 import pandas as pd
+import time
 import tqdm
 import transformers
 import torch
@@ -17,19 +18,21 @@ class ModelSize(Enum):
     MEDIUM = 1
     LARGE = 2
 
-def make_prompts(examples):
+def make_prompts(examples, context_label="context"):
     """Make QA prompts from examples"""
-    contexes = examples["context"]
+    contexts = examples[context_label]
     questions = examples["question"]
     samples = [f"""Context: {context}
 Question: {question}
-Answer:""" for context, question in zip(contexes, questions)]
+Answer:""" for context, question in zip(contexts, questions)]
     return {"prompt": samples}
 
 
 def get_test_dataset(tokenizer, 
                      dataset="han2lin/squad", 
-                     cache_dir=None):
+                     cache_dir=None,
+                     context_label="context"):
+    logging.info(f"Loading test dataset with cache_dir: {cache_dir}")
     all_datasets = load_dataset(dataset, cache_dir=cache_dir)
     test_dataset = all_datasets["test"]
     logging.info(f"Test dataset size: {len(test_dataset)}")
@@ -40,9 +43,13 @@ def get_test_dataset(tokenizer,
     
     test_cache_file_name = None
     if cache_dir:
-        test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_test_encoded"
-    logging.info(f"Dataset cache files: {test_cache_file_name}")
-    test_dataset = test_dataset.map(make_prompts, batched=True)
+        test_cache_file_name = f"{cache_dir}/{tokenizer.name_or_path}_{context_label}_test_encoded"
+    logging.info(f"Dataset cache file: {test_cache_file_name}")
+    test_dataset = test_dataset.map(
+        lambda x: make_prompts(x, context_label=context_label), 
+        batched=True,
+        cache_file_name=test_cache_file_name,
+    )
     
     return test_dataset
 
@@ -56,7 +63,11 @@ def get_predictions(prompts,
                     tokenizer, 
                     max_new_tokens=50,
                     use_cuda=True):
-    input_ids = tokenizer(prompts, padding=True, return_tensors="pt")
+    input_ids = tokenizer(prompts,
+                          max_length=970,
+                          padding="max_length", 
+                          truncation=True,
+                          return_tensors="pt")
     if use_cuda:
         input_ids.to("cuda")
     greedy_output = model.generate(**input_ids, max_new_tokens=max_new_tokens)
@@ -110,9 +121,14 @@ def score_data(dataset_pd):
 
 def write_stats(dataset_pd: pd.DataFrame, 
                 model_name: str, 
-                output_dir: str):
-    stats_path = f"{output_dir}/{model_name}_stats.csv"
-    predictions_path = f"{output_dir}/{model_name}_pred.csv"
+                output_dir: str,
+                suffix: str = ""):
+    utc_seconds = int(time.time())
+    stats_path = f"{output_dir}/{model_name}_stats_{utc_seconds}.csv"
+    predictions_path = f"{output_dir}/{model_name}_pred_{utc_seconds}.csv"
+    if suffix:
+        stats_path = f"{output_dir}/{model_name}_{suffix}_stats.csv"
+        predictions_path = f"{output_dir}/{model_name}_{suffix}_pred.csv"
 
     stats = dataset_pd[["exact_score", "f1_score"]].mean()
     logging.info(f"Overall stats:\n{stats}")
@@ -128,6 +144,15 @@ def model_size_string(value):
     else:
         raise argparse.ArgumentTypeError(f"Size should be either 'medium' or 'large' but received {value}")
 
+def perturbation_string(value):
+    options = ["", "context", "butter", "yoda", "sentence_reorder"]
+    if value is None:
+        return ""
+    if value.lower() in options:
+        return value.lower()
+    else:
+        raise argparse.ArgumentTypeError(f"Size should be one of {options} but received {value}")
+        
 
 def int_range(min, max):
     def int_range_checker(arg):
@@ -202,6 +227,14 @@ def main(argv=None):
         required=False,
         help="Directory for storing predictions. If not set, uses cache_dir if cache_dir is set, else writes to current directory.",
     )
+    parser.add_argument(
+        "--perturbation",
+        dest="perturbation",
+        type=str,
+        required=False,
+        default="",
+        help="The perturbation type to test. If empty, no perturbation is choosen from the test dataset.",
+    )
 
 
     known_args, pipeline_args = parser.parse_known_args(argv)
@@ -212,8 +245,13 @@ def main(argv=None):
 
     # Dataset
     dataset_path = known_args.dataset_path
+    context_label = "context"
+    if known_args.perturbation:
+        context_label = known_args.perturbation
 
     logging.info(f"Evaluating models of size {model_size} on {dataset_path}: {model_paths}")
+    if context_label != "context":
+        logging.info(f"Evaluating with perturbation '{context_label}' from {dataset_path}")
 
     use_cuda = known_args.use_cuda
     if use_cuda:
@@ -232,7 +270,10 @@ def main(argv=None):
     else:
         tokenizer = AutoTokenizer.from_pretrained("gpt2-large", cache_dir=cache_dir)
 
-    test_dataset = get_test_dataset(tokenizer, dataset_path, cache_dir=cache_dir)
+    test_dataset = get_test_dataset(tokenizer, 
+                                    dataset_path, 
+                                    cache_dir=cache_dir,
+                                    context_label=context_label)
 
     for model_path in tqdm.tqdm(model_paths):
         logging.info(f"Evaluating model: {model_path}")
@@ -257,7 +298,7 @@ def main(argv=None):
         dataset_pd["f1_score"] = f1_scores.values()
     
         logging.info(f"Writing prediction and stats into {output_dir}")
-        write_stats(dataset_pd, name, output_dir)
+        write_stats(dataset_pd, name, output_dir, suffix=context_label)
         
         del dataset_pd
 
